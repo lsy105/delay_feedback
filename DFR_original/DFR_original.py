@@ -3,6 +3,15 @@ import numpy as np
 from numpy import linalg as LA
 import matplotlib.pyplot as plt
 
+from math import*
+ 
+def square_rooted(x):
+    return round(sqrt(sum([a*a for a in x])),3)
+ 
+def cosine_similarity(x,y):
+    numerator = sum(a*b for a,b in zip(x,y))
+    denominator = square_rooted(x)*square_rooted(y)
+    return round(numerator/float(denominator),3)
 
 class FDROriginal:
     # Parameters
@@ -13,7 +22,7 @@ class FDROriginal:
     k3 = 4 * k1
     k = k1 + k2 + k3
     gain = 0.8
-    scale = 1
+    scale = 1.0
     m = np.array(nv)
     j = np.zeros(k*nv)
 
@@ -42,7 +51,14 @@ class FDROriginal:
 
     X_test = np.zeros((k3, n))
     output_test = np.zeros(k3)
-
+    
+    #stack layers
+    num_layers = 3
+    stack_params = []
+    for _ in range(num_layers):
+        param = np.random.rand(n, n) * 2.0 - 1.0 
+        stack_params.append(param)
+ 
     # Define input & actual output data
     # NARMA10 task- nonlinear auto-regressive moving average
     def define_input_output(self):
@@ -74,6 +90,7 @@ class FDROriginal:
         # j is the masked input
         self.m = np.random.uniform(low=0.0, high=1.0, size=self.nv)
         it = np.nditer(self.input, flags=['f_index'])
+        pre = np.zeros((9))
         while not it.finished:
             masked_elem = np.dot(it[0], self.m)
             for index, value in enumerate(masked_elem):
@@ -83,12 +100,21 @@ class FDROriginal:
     # Initialize reservoir
     def init_reservoir(self):
         for i in range(0, self.k1 * self.nv):
+            idx = i / self.nv
+            self.gain = 0.9 * self.gain + 0.1 * (1.0 - np.abs(self.input[idx] - self.input[idx - 1]) / 1.0)
             self.x_next[0] = np.tanh(self.scale * self.j[i] + self.gain * self.x[self.n - 1])
             self.x_next[1: self.n] = self.x[0: self.n - 1]
             self.x = self.x_next
 
+    def StackLayer(self, data):
+        data1 = np.tanh(np.dot(data, self.stack_params[0]))
+        data2 = np.tanh(np.dot(data1, self.stack_params[1]))
+        data3 = np.dot(data2 + data1, self.stack_params[2])
+        return data3
+                    
     # Training data through the reservoir and store the node states.
     def train_reservoir(self):
+        print self.gain
         for i in range(0, self.k2 * self.nv):
             t = self.k1 * self.nv + i
             self.x_next[0] = np.tanh(self.scale * self.j[t] + self.gain * self.x[self.n - 1])
